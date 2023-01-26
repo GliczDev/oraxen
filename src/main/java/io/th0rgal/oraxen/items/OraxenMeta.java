@@ -4,6 +4,7 @@ import io.th0rgal.oraxen.config.Settings;
 import io.th0rgal.oraxen.utils.Utils;
 import org.bukkit.configuration.ConfigurationSection;
 
+import java.util.Arrays;
 import java.util.List;
 
 public class OraxenMeta {
@@ -17,6 +18,7 @@ public class OraxenMeta {
     private String castModel;
     private List<String> layers;
     private String parentModel;
+    private String modelDirectory;
     private boolean generate_model;
     private boolean hasPackInfos = false;
     private boolean excludedFromInventory = false;
@@ -51,6 +53,7 @@ public class OraxenMeta {
         // If not specified, check if a model or texture is set
         this.generate_model = configurationSection.getBoolean("generate_model", getModelName().isEmpty());
         this.parentModel = configurationSection.getString("parent_model", "item/generated");
+        this.modelDirectory = configurationSection.getString("model_directory", "minecraft/models");
     }
 
     // this might not be a very good function name
@@ -66,6 +69,15 @@ public class OraxenMeta {
         else if (modelName != null && modelName.endsWith(".json"))
             return modelName.substring(0, modelName.length() - 5);
         else return modelName;
+    }
+
+    private String getFixedModelDirectory() {
+        String[] modelDirElements = modelDirectory.split("/");
+        String path = String.join("/", Arrays.copyOfRange(modelDirElements, 2, modelDirElements.length));
+        if (!path.isEmpty()) path += "/";
+        if (!modelDirElements[0].equals("minecraft"))
+            path = modelDirElements[0] + ":" + path;
+        return path;
     }
 
     public boolean hasPackInfos() {
@@ -92,12 +104,20 @@ public class OraxenMeta {
         return modelName;
     }
 
+    public String getModelPath() {
+        return getFixedModelDirectory() + modelName;
+    }
+
     public boolean hasBlockingModel() {
         return blockingModel != null;
     }
 
     public String getBlockingModelName() {
         return blockingModel;
+    }
+
+    public String getBlockingModelPath() {
+        return getFixedModelDirectory() + blockingModel;
     }
 
     public boolean hasCastModel() {
@@ -108,12 +128,20 @@ public class OraxenMeta {
         return castModel;
     }
 
+    public String getCastModelPath() {
+        return getFixedModelDirectory() + castModel;
+    }
+
     public boolean hasChargedModel() {
         return chargedModel != null;
     }
 
     public String getChargedModelName() {
         return chargedModel;
+    }
+
+    public String getChargedModelPath() {
+        return getFixedModelDirectory() + chargedModel;
     }
 
     public boolean hasFireworkModel() {
@@ -124,12 +152,20 @@ public class OraxenMeta {
         return fireworkModel;
     }
 
+    public String getFireworkModelPath() {
+        return getFixedModelDirectory() + fireworkModel;
+    }
+
     public boolean hasPullingModels() {
         return pullingModels != null && !pullingModels.isEmpty();
     }
 
     public List<String> getPullingModels() {
         return pullingModels;
+    }
+
+    public List<String> getPullingModelsPaths() {
+        return pullingModels.stream().map(model -> getFixedModelDirectory() + model).toList();
     }
 
     public boolean hasLayers() {
@@ -144,6 +180,10 @@ public class OraxenMeta {
         return parentModel;
     }
 
+    public String getModelDirectory() {
+        return modelDirectory;
+    }
+
     public boolean shouldGenerateModel() {
         return generate_model;
     }
@@ -151,5 +191,4 @@ public class OraxenMeta {
     public boolean isNoUpdate() {
         return noUpdate;
     }
-
 }

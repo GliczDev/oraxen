@@ -5,13 +5,11 @@ import com.comphenix.protocol.ProtocolManager;
 import dev.jorel.commandapi.CommandAPI;
 import dev.jorel.commandapi.CommandAPIConfig;
 import io.th0rgal.oraxen.api.OraxenItems;
-import io.th0rgal.oraxen.api.events.OraxenItemsLoadedEvent;
 import io.th0rgal.oraxen.commands.CommandsManager;
 import io.th0rgal.oraxen.compatibilities.CompatibilitiesManager;
 import io.th0rgal.oraxen.config.ConfigsManager;
 import io.th0rgal.oraxen.config.Message;
 import io.th0rgal.oraxen.config.Settings;
-import io.th0rgal.oraxen.config.SettingsUpdater;
 import io.th0rgal.oraxen.font.FontManager;
 import io.th0rgal.oraxen.font.packets.InventoryPacketListener;
 import io.th0rgal.oraxen.font.packets.TitlePacketListener;
@@ -73,8 +71,6 @@ public class OraxenPlugin extends JavaPlugin {
         audience = BukkitAudiences.create(this);
         clickActionManager = new ClickActionManager(this);
         reloadConfigs();
-        if (Settings.KEEP_UP_TO_DATE.toBool())
-            new SettingsUpdater().handleSettingsUpdate();
         fontManager = new FontManager(configsManager);
         hudManager = new HudManager(configsManager);
         new CommandsManager().loadCommands();
@@ -118,10 +114,7 @@ public class OraxenPlugin extends JavaPlugin {
         uploadManager = new UploadManager(this);
         uploadManager.uploadAsyncAndSendToPlayers(resourcePack);
         new Metrics(this, 5371);
-        Bukkit.getScheduler().runTask(this, () -> {
-            OraxenItems.loadItems(configsManager);
-            Bukkit.getPluginManager().callEvent(new OraxenItemsLoadedEvent());
-        });
+        Bukkit.getScheduler().runTask(this, () -> OraxenItems.loadItems(configsManager));
     }
 
     @Override

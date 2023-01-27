@@ -13,6 +13,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 public abstract class RecipeBuilder {
@@ -54,15 +55,21 @@ public abstract class RecipeBuilder {
 
     protected void setSerializedItem(ConfigurationSection section, ItemStack itemStack) {
 
+        String itemID = OraxenItems.getIdByItem(itemStack);
+
         // if our itemstack is made using oraxen and is not modified
-        if (OraxenItems.exists(itemStack)) {
-            String itemID = OraxenItems.getIdByItem(itemStack);
+        if (itemID != null
+                && Objects.equals(OraxenItems.getItemById(itemID).build().getItemMeta(), itemStack.getItemMeta())) { // lgtm [java/dereferenced-value-may-be-null]
             section.set("oraxen_item", itemID);
+            return;
         }
+
         // if our itemstack is an unmodified vanilla item
-        else if (itemStack != null && itemStack.equals(new ItemStack(itemStack.getType())))
+        if (itemStack != null && itemStack.equals(new ItemStack(itemStack.getType()))) {
             section.set("minecraft_type", itemStack.getType().toString());
-        else section.set("minecraft_item", itemStack);
+            return;
+        }
+        section.set("minecraft_item", itemStack);
     }
 
     public YamlConfiguration getConfig() {

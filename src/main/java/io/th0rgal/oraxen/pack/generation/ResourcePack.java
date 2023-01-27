@@ -78,9 +78,25 @@ public class ResourcePack {
         if (!Settings.GENERATE.toBool())
             return;
 
-        if (Settings.HIDE_SCOREBOARD_NUMBERS.toBool() && Bukkit.getPluginManager().isPluginEnabled("HappyHUD")) {
-            Logs.logError("HappyHUD detected with hide_scoreboard_numbers enabled!");
-            Logs.logWarning("Recommend following this guide for compatibility: https://docs.oraxen.com/compatibility/happyhud");
+        if (Settings.HIDE_SCOREBOARD_NUMBERS.toBool()) {
+            if (Bukkit.getPluginManager().isPluginEnabled("HappyHUD")) {
+                Logs.logError("HappyHUD detected!");
+                Logs.logWarning("Recommend following this guide for compatibility: https://docs.oraxen.com/compatibility/happyhud");
+                /*
+                Settings.HIDE_SCOREBOARD_NUMBERS.setValue(false);
+                try {
+                    Path pluginDir = OraxenPlugin.get().getDataFolder().getAbsoluteFile().toPath();
+                    Files.deleteIfExists(pluginDir.resolve("pack/shaders/core/rendertype_text.json"));
+                    Files.deleteIfExists(pluginDir.resolve("pack/shaders/core/rendertype_text.vsh"));
+                } catch (Exception ignored) {
+                }*/
+            } else {
+                plugin.saveResource("pack/shaders/core/rendertype_text.json", true);
+                plugin.saveResource("pack/shaders/core/rendertype_text.vsh", true);
+            }
+        } else {
+            checkShaderFiles(new File(shaderFolder, "core/rendertype_text.json"));
+            checkShaderFiles(new File(shaderFolder, "core/rendertype_text.vsh"));
         }
 
         try {
@@ -116,12 +132,12 @@ public class ResourcePack {
                     getAllFiles(folder, output, "assets/minecraft");
             }
 
-            if (Settings.GENERATE_CUSTOM_ARMOR_TEXTURES.toBool() && customArmorsTextures.hasCustomArmors()) {
+            if (customArmorsTextures.hasCustomArmors()) {
                 customArmorsTextures.rescaleVanillaArmorFiles(output);
                 String armorPath = "assets/minecraft/textures/models/armor";
                 output.add(new VirtualFile(armorPath, "leather_layer_1.png", customArmorsTextures.getLayerOne()));
                 output.add(new VirtualFile(armorPath, "leather_layer_2.png", customArmorsTextures.getLayerTwo()));
-                if (Settings.AUTOMATICALLY_GENERATE_SHADER_COMPATIBLE_ARMOR.toBool())
+                if (customArmorsTextures.shouldGenerateOptifineFiles())
                     output.addAll(customArmorsTextures.getOptifineFiles());
             }
 
@@ -130,12 +146,8 @@ public class ResourcePack {
             e.printStackTrace();
         }
 
-        if (Settings.GENERATE_ATLAS_FILE.toBool())
-            AtlasGenerator.generateAtlasFile(output);
-        if (Settings.MERGE_FONTS.toBool())
-            DuplicationHandler.mergeFontFiles(output);
-        if (Settings.MERGE_ITEM_MODELS.toBool())
-            DuplicationHandler.mergeBaseItemFiles(output);
+        if (Settings.CONVERT_PACK_FOR_1_19_3.toBool())
+            PackConvertor.handlePackConversionFor_1_19_3(output);
 
         List<String> excludedExtensions = Settings.EXCLUDED_FILE_EXTENSIONS.toStringList();
         if (!excludedExtensions.isEmpty() && !output.isEmpty()) {
@@ -178,7 +190,7 @@ public class ResourcePack {
             ZipEntry entry = zip.getNextEntry();
             final ResourcesManager resourcesManager = new ResourcesManager(OraxenPlugin.get());
             while (entry != null) {
-                extract(entry, extractModels, extractTextures, extractShaders,
+                extract(entry, extractModels, extractTextures,
                         extractLang, extractFonts, extractSounds, extractAssets, extractOptifine, resourcesManager);
                 entry = zip.getNextEntry();
             }
@@ -207,14 +219,14 @@ public class ResourcePack {
         }
     }
 
-    private void extract(ZipEntry entry, boolean extractModels, boolean extractTextures,
-                         boolean extractShaders, boolean extractLang, boolean extractFonts,
+    private void extract(ZipEntry entry, boolean extractModels,
+                         boolean extractTextures, boolean extractLang, boolean extractFonts,
                          boolean extractSounds, boolean extractAssets,
                          boolean extractOptifine, ResourcesManager resourcesManager) {
         final String name = entry.getName();
         final boolean isSuitable = (extractModels && name.startsWith("pack/models"))
                 || (extractTextures && name.startsWith("pack/textures"))
-                || (extractShaders && name.startsWith("pack/shaders"))
+                || (extractTextures && name.startsWith("pack/shaders"))
                 || (extractLang && name.startsWith("pack/lang"))
                 || (extractFonts && name.startsWith("pack/font"))
                 || (extractSounds && name.startsWith("pack/sounds"))
@@ -229,7 +241,7 @@ public class ResourcePack {
             final ItemBuilder item = entry.getValue();
             if (item.getOraxenMeta().hasPackInfos()) {
                 if (item.getOraxenMeta().shouldGenerateModel())
-                    writeStringToVirtual(item.getOraxenMeta().getModelPath(),
+                    writeStringToVirtual("assets/" + item.getOraxenMeta().getModelDirectory(),
                             item.getOraxenMeta().getModelName() + ".json",
                             new ModelGenerator(item.getOraxenMeta()).getJson().toString());
                 final List<ItemBuilder> items = texturedItems.getOrDefault(item.build().getType(), new ArrayList<>());

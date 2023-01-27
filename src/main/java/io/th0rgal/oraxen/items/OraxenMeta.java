@@ -18,15 +18,14 @@ public class OraxenMeta {
     private String castModel;
     private List<String> layers;
     private String parentModel;
-    private String generatedModelPath;
+    private String modelDirectory;
     private boolean generate_model;
     private boolean hasPackInfos = false;
     private boolean excludedFromInventory = false;
     private boolean noUpdate = false;
-    private boolean disableEnchanting = false;
 
-    public void setExcludedFromInventory(boolean excluded) {
-        this.excludedFromInventory = excluded;
+    public void setExcludedFromInventory() {
+        this.excludedFromInventory = true;
     }
 
     public boolean isExcludedFromInventory() {
@@ -53,8 +52,8 @@ public class OraxenMeta {
 
         // If not specified, check if a model or texture is set
         this.generate_model = configurationSection.getBoolean("generate_model", getModelName().isEmpty());
-        this.generatedModelPath = configurationSection.getString("generated_model_path", "");
         this.parentModel = configurationSection.getString("parent_model", "item/generated");
+        this.modelDirectory = configurationSection.getString("model_directory", "minecraft/models");
     }
 
     // this might not be a very good function name
@@ -92,21 +91,17 @@ public class OraxenMeta {
         this.noUpdate = noUpdate;
     }
 
-    public void setDisableEnchanting(boolean disableEnchanting) { this.disableEnchanting = disableEnchanting; }
-
     public String getModelName() {
         return modelName;
     }
 
     public String getModelPath() {
-        String[] pathElements = generatedModelPath.split(":");
-        String path;
-        if (pathElements.length > 1)
-            path = "assets/" + pathElements[0] + "/models/" + pathElements[1];
-        else
-            path = "assets/minecraft/models/" + pathElements[0];
-        if (path.endsWith("/")) path = path.substring(0, path.length() - 1);
-        return path;
+        String[] modelDirElements = modelDirectory.split("/");
+        String path = String.join("/", Arrays.copyOfRange(modelDirElements, 2, modelDirElements.length));
+        if (!path.isEmpty()) path += "/";
+        if (!modelDirElements[0].equals("minecraft"))
+            path = modelDirElements[0] + ":" + path;
+        return path + modelName;
     }
 
     public boolean hasBlockingModel() {
@@ -161,10 +156,8 @@ public class OraxenMeta {
         return parentModel;
     }
 
-    public String getGeneratedModelPath() {
-        if (generatedModelPath.isEmpty())
-            return generatedModelPath;
-        return generatedModelPath + (generatedModelPath.endsWith("/") ? "" : "/");
+    public String getModelDirectory() {
+        return modelDirectory;
     }
 
     public boolean shouldGenerateModel() {
@@ -174,7 +167,4 @@ public class OraxenMeta {
     public boolean isNoUpdate() {
         return noUpdate;
     }
-
-    public boolean isDisableEnchanting() { return disableEnchanting; }
-
 }

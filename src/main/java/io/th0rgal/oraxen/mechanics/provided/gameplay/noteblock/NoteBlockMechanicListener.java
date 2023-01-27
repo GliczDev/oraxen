@@ -22,13 +22,11 @@ import org.bukkit.block.data.BlockData;
 import org.bukkit.block.data.Directional;
 import org.bukkit.block.data.type.NoteBlock;
 import org.bukkit.entity.EntityType;
-import org.bukkit.entity.FallingBlock;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.*;
-import org.bukkit.event.entity.EntityChangeBlockEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
 import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.inventory.InventoryCreativeEvent;
@@ -235,7 +233,7 @@ public class NoteBlockMechanicListener implements Listener {
             if (type.toString().endsWith("ANVIL")) {
                 ((Directional) data).setFacing(getAnvilFacing(event.getBlockFace()));
             }
-            block.getWorld().spawnFallingBlock(BlockHelpers.toCenterBlockLocation(relative.getLocation()), data);
+            block.getWorld().spawnFallingBlock(relative.getLocation().add(0.5, 0, 0.5), data);
             return;
         }
 
@@ -293,45 +291,20 @@ public class NoteBlockMechanicListener implements Listener {
         // determines the new block data of the block
         NoteBlockMechanic mechanic = (NoteBlockMechanic) factory.getMechanic(itemID);
         int customVariation = mechanic.getCustomVariation();
-        boolean isFalling = mechanic.isFalling();
         BlockFace face = event.getBlockFace();
 
         if (mechanic.isDirectional()) {
             DirectionalBlock directional = mechanic.getDirectional();
-            if (!directional.isParentBlock()) {
+            if (!directional.isParentBlock())
                 directional = directional.getParentBlockMechanic(mechanic).getDirectional();
-            }
 
             customVariation = directional.getDirectionVariation(face, player);
         }
 
-        BlockData data = NoteBlockMechanicFactory.createNoteBlockData(customVariation);
-        Block placedBlock = makePlayerPlaceBlock(player, event.getHand(), event.getItem(), placedAgainst, face, data);
+        Block placedBlock = makePlayerPlaceBlock(player, event.getHand(), event.getItem(), placedAgainst, face, NoteBlockMechanicFactory.createNoteBlockData(customVariation));
         if (placedBlock != null) {
-            if (isFalling && face != BlockFace.DOWN && placedAgainst.getRelative(face).getRelative(BlockFace.DOWN).getType().isAir()) {
-                // We place it above first to see if all checks for placing pass
-                placedBlock.setType(Material.AIR, false);
-                Location spawnLoc = BlockHelpers.toCenterBlockLocation(placedAgainst.getRelative(face).getLocation());
-                player.getWorld().spawnFallingBlock(spawnLoc, data);
-            } //else OraxenBlocks.place(mechanic.getItemID(), placedBlock.getLocation());
+            OraxenBlocks.place(mechanic.getItemID(), placedBlock.getLocation());
         }
-    }
-
-    @EventHandler(priority = EventPriority.HIGHEST)
-    public void onFallingOraxenBlock(EntityChangeBlockEvent event) {
-        if (event.getEntity() instanceof FallingBlock fallingBlock) {
-            BlockData blockData = fallingBlock.getBlockData();
-            NoteBlockMechanic mechanic = OraxenBlocks.getNoteBlockMechanic(blockData);
-            if (mechanic == null) return;
-            OraxenBlocks.place(mechanic.getItemID(), event.getBlock().getLocation());
-            event.setCancelled(true);
-        }
-    }
-
-    @EventHandler
-    public void onBreakBeneathFallingOraxenBlock(BlockBreakEvent event) {
-        Block block = event.getBlock();
-        handleFallingOraxenBlockAbove(block);
     }
 
     @EventHandler(priority = EventPriority.NORMAL, ignoreCancelled = true)
@@ -344,9 +317,11 @@ public class NoteBlockMechanicListener implements Listener {
 
         NoteBlockMechanic mechanic = OraxenBlocks.getNoteBlockMechanic(block);
         if (mechanic == null) return;
+        if (mechanic.isDirectional())
+            mechanic = mechanic.getDirectional().getParentBlockMechanic(mechanic);
+
         if (!mechanic.canIgnite()) return;
         if (item.getType() != Material.FLINT_AND_STEEL && item.getType() != Material.FIRE_CHARGE) return;
-
         BlockIgniteEvent igniteEvent = new BlockIgniteEvent(block, BlockIgniteEvent.IgniteCause.FLINT_AND_STEEL, event.getPlayer());
         Bukkit.getPluginManager().callEvent(igniteEvent);
     }
@@ -402,20 +377,6 @@ public class NoteBlockMechanicListener implements Listener {
         }
     }
 
-    //TODO Also trigger for attached blocks
-    /* Make Falling Oraxen Blocks above the given block trigger causing physics changes*/
-    private void handleFallingOraxenBlockAbove(Block block) {
-        Block blockAbove = block.getRelative(BlockFace.UP);
-        NoteBlockMechanic mechanic = OraxenBlocks.getNoteBlockMechanic(blockAbove);
-        if (mechanic == null || !mechanic.isFalling()) return;
-        Location fallingLocation = BlockHelpers.toCenterBlockLocation(blockAbove.getLocation());
-        BlockData fallingData = OraxenBlocks.getOraxenBlockData(mechanic.getItemID());
-        if (fallingData == null) return;
-        OraxenBlocks.remove(blockAbove.getLocation(), null);
-        blockAbove.getWorld().spawnFallingBlock(fallingLocation, fallingData);
-        handleFallingOraxenBlockAbove(blockAbove);
-    }
-
     private HardnessModifier getHardnessModifier() {
         return new HardnessModifier() {
 
@@ -459,13 +420,14 @@ public class NoteBlockMechanicListener implements Listener {
     }
 
     public Block makePlayerPlaceBlock(final Player player, final EquipmentSlot hand, final ItemStack item,
-                                      final Block placedAgainst, final BlockFace face, final BlockData newBlock) {
+                                       final Block placedAgainst, final BlockFace face, final BlockData newBlock) {
         final Block target;
         final String sound;
         final Material type = placedAgainst.getType();
 
         if (BlockHelpers.REPLACEABLE_BLOCKS.contains(type))
             target = placedAgainst;
+
         else {
             target = placedAgainst.getRelative(face);
             if (!target.getType().isAir() && !target.isLiquid() && target.getType() != Material.LIGHT) return null;
@@ -476,6 +438,7 @@ public class NoteBlockMechanicListener implements Listener {
         target.setBlockData(newBlock, isFlowing);
         final BlockState currentBlockState = target.getState();
         final NoteBlockMechanic againstMechanic = OraxenBlocks.getNoteBlockMechanic(placedAgainst);
+        getNoteBlockMechanic(placedAgainst);
 
         final BlockPlaceEvent blockPlaceEvent = new BlockPlaceEvent(target, currentBlockState, placedAgainst, item, player, true, hand);
         Bukkit.getPluginManager().callEvent(blockPlaceEvent);
@@ -487,14 +450,14 @@ public class NoteBlockMechanicListener implements Listener {
         if (BlockHelpers.isStandingInside(player, target) || !ProtectionLib.canBuild(player, target.getLocation()))
             blockPlaceEvent.setCancelled(true);
         if (!blockPlaceEvent.canBuild() || blockPlaceEvent.isCancelled()) {
-            target.setBlockData(curentBlockData);
+            target.setBlockData(curentBlockData, false); // false to cancel physic
             return null;
         }
 
         final OraxenNoteBlockPlaceEvent oraxenPlaceEvent = new OraxenNoteBlockPlaceEvent(OraxenBlocks.getNoteBlockMechanic(target), target, player);
         Bukkit.getPluginManager().callEvent(oraxenPlaceEvent);
         if (oraxenPlaceEvent.isCancelled()) {
-            target.setBlockData(curentBlockData); // false to cancel physic
+            target.setBlockData(curentBlockData, false); // false to cancel physic
             return null;
         }
 
@@ -538,7 +501,6 @@ public class NoteBlockMechanicListener implements Listener {
 
     // Used to determine what instrument to use when playing a note depending on below block
     public static Map<Instrument, List<String>> instrumentMap = new HashMap<>();
-
     private static Map<Instrument, List<String>> getInstrumentMap() {
         Map<Instrument, List<String>> map = new HashMap<>();
         map.put(Instrument.BELL, List.of("gold_block"));

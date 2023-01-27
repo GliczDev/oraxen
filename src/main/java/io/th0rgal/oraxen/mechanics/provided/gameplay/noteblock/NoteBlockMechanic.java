@@ -35,7 +35,6 @@ public class NoteBlockMechanic extends Mechanic {
     private int period;
     private final int light;
     private final boolean canIgnite;
-    private final boolean isFalling;
     private final FarmBlockDryout farmBlockDryout;
     private final LogStripping logStripping;
     private final DirectionalBlock directionalBlock;
@@ -84,7 +83,6 @@ public class NoteBlockMechanic extends Mechanic {
         light = section.getInt("light", -1);
         clickActions = ClickAction.parseList(section);
         canIgnite = section.getBoolean("can_ignite", false);
-        isFalling = section.getBoolean("is_falling", false);
 
         if (section.isConfigurationSection("farmblock")) {
             farmBlockDryout = new FarmBlockDryout(getItemID(), Objects.requireNonNull(section.getConfigurationSection("farmblock")));
@@ -124,18 +122,8 @@ public class NoteBlockMechanic extends Mechanic {
     public boolean hasDryout() { return farmBlockDryout != null; }
     public FarmBlockDryout getDryout() { return farmBlockDryout; }
 
-    public boolean isLog() {
-        if (isDirectional() && !directionalBlock.isParentBlock()) {
-            return logStripping != null || directionalBlock.getParentBlockMechanic(this).isLog();
-        } else return logStripping != null;
-    }
+    public boolean isLog() { return logStripping != null; }
     public LogStripping getLog() { return logStripping; }
-
-    public boolean isFalling() {
-        if (isDirectional() && !directionalBlock.isParentBlock()) {
-            return isFalling || directionalBlock.getParentBlockMechanic(this).isFalling();
-        } else return isFalling;
-    }
 
     public boolean isDirectional() { return directionalBlock != null; }
     public DirectionalBlock getDirectional() { return directionalBlock; }
@@ -160,9 +148,7 @@ public class NoteBlockMechanic extends Mechanic {
     }
 
     public boolean hasLight() {
-        if (isDirectional() && !directionalBlock.isParentBlock()) {
-            return light != -1 || directionalBlock.getParentBlockMechanic(this).hasLight();
-        } else return light != -1;
+        return light != -1;
     }
 
     public int getLight() {
@@ -170,9 +156,7 @@ public class NoteBlockMechanic extends Mechanic {
     }
 
     public boolean canIgnite() {
-        if (isDirectional() && !directionalBlock.isParentBlock()) {
-            return canIgnite || directionalBlock.getParentBlockMechanic(this).canIgnite();
-        } else return canIgnite;
+        return canIgnite;
     }
 
     public boolean hasClickActions() { return !clickActions.isEmpty(); }

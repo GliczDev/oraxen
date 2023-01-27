@@ -52,7 +52,6 @@ public class CustomArmorsTextures {
 
         if (!name.endsWith(".png")) return false;
         if (!name.contains("armor_layer") && !name.contains("leather_layer")) return false;
-        if (!Settings.GENERATE_CUSTOM_ARMOR_TEXTURES.toBool()) return false;
 
         BufferedImage img;
         try {
@@ -239,6 +238,10 @@ public class CustomArmorsTextures {
             }
         }
         Logs.logSuccess("Finished rescaling and adding vanilla armor files!");
+    }
+
+    public boolean shouldGenerateOptifineFiles() {
+        return Settings.AUTOMATICALLY_GENERATE_SHADER_COMPATIBLE_ARMOR.toBool();
     }
 
     public int getAnimatedArmorFramerate() {

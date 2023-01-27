@@ -24,7 +24,6 @@ import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.block.data.BlockData;
 import org.bukkit.entity.*;
-import org.bukkit.event.Event;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
@@ -126,19 +125,16 @@ public class FurnitureListener implements Listener {
         }
     }
 
-    @EventHandler(ignoreCancelled = true, priority = EventPriority.NORMAL)
-    public void onFurniturePlace(final PlayerInteractEvent event) {
+    @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGH)
+    public void onHangingPlaceEvent(final PlayerInteractEvent event) {
         final Player player = event.getPlayer();
         final Block placedAgainst = event.getClickedBlock();
-        final EquipmentSlot hand = event.getHand();
         assert placedAgainst != null;
-        Block block = getTarget(placedAgainst, event.getBlockFace());
+        final Block block = getTarget(placedAgainst, event.getBlockFace());
         ItemStack item = event.getItem();
 
-        if (event.useInteractedBlock() == Event.Result.DENY) return;
-        if (event.useItemInHand() == Event.Result.DENY) return;
         if (event.getAction() != Action.RIGHT_CLICK_BLOCK) return;
-        if (item == null || hand != EquipmentSlot.HAND) return;
+        if (item == null || event.getHand() != EquipmentSlot.HAND) return;
         if (placedAgainst.getType().isInteractable() && placedAgainst.getType() != Material.NOTE_BLOCK) return;
 
         if (block == null) return;
@@ -147,6 +143,7 @@ public class FurnitureListener implements Listener {
         if (mechanic == null) return;
 
         Block farm = block.getRelative(BlockFace.DOWN);
+
         if (mechanic.farmlandRequired && farm.getType() != Material.FARMLAND) return;
 
         if (mechanic.farmblockRequired) {
@@ -156,19 +153,22 @@ public class FurnitureListener implements Listener {
             if (!farmMechanic.getDryout().isFarmBlock()) return;
         }
 
-        BlockPlaceEvent blockPlaceEvent = new BlockPlaceEvent(block, block.getState(), placedAgainst, item, player, true, hand);
+        Material oldtype = block.getType();
+        block.setType(Material.AIR, false);
+        final BlockPlaceEvent blockPlaceEvent = new BlockPlaceEvent(block, block.getState(), placedAgainst,
+                item, player,
+                true, Objects.requireNonNull(event.getHand()));
 
         final Rotation rotation = getRotation(player.getEyeLocation().getYaw(), mechanic.getBarriers().size() > 1);
         final float yaw = mechanic.getYaw(rotation);
-        if (player.getGameMode() == GameMode.ADVENTURE)
-            blockPlaceEvent.setCancelled(true);
+        if (player.getGameMode() == GameMode.ADVENTURE) blockPlaceEvent.setCancelled(true);
         if (mechanic.notEnoughSpace(yaw, block.getLocation())) {
             blockPlaceEvent.setCancelled(true);
             Message.NOT_ENOUGH_SPACE.send(player);
         }
 
         if (!blockPlaceEvent.canBuild() || blockPlaceEvent.isCancelled()) {
-            block.setBlockData(currentBlockData);
+            block.setBlockData(currentBlockData, false); // false to cancel physic
             return;
         }
 
@@ -176,35 +176,41 @@ public class FurnitureListener implements Listener {
         Utils.swingHand(player, event.getHand());
 
         final OraxenFurniturePlaceEvent furniturePlaceEvent = new OraxenFurniturePlaceEvent(mechanic, block, itemframe, player);
+
         Bukkit.getPluginManager().callEvent(furniturePlaceEvent);
 
         if (furniturePlaceEvent.isCancelled()) {
             OraxenFurniture.remove(itemframe, null);
-            block.setBlockData(currentBlockData);
             return;
         }
 
         if (!player.getGameMode().equals(GameMode.CREATIVE))
             item.setAmount(item.getAmount() - 1);
-        event.setUseInteractedBlock(Event.Result.DENY);
     }
 
     private Block getTarget(Block placedAgainst, BlockFace blockFace) {
-        Block target;
-        if (BlockHelpers.REPLACEABLE_BLOCKS.contains(placedAgainst.getType()))
-            target = placedAgainst;
+        final Material type = placedAgainst.getType();
+        if (BlockHelpers.REPLACEABLE_BLOCKS.contains(type))
+            return placedAgainst;
         else {
-            target = placedAgainst.getRelative(blockFace);
-            if (!target.getType().isAir() && !target.isLiquid() && target.getType() != Material.LIGHT) return null;
+            Block target = placedAgainst.getRelative(blockFace);
+            if (!target.getType().isAir() && target.getType() != Material.WATER)
+                return null;
+            return target;
         }
-        return target;
     }
 
-    private FurnitureMechanic getMechanic(ItemStack item, Player player, Block placed) {
+    private FurnitureMechanic getMechanic(ItemStack item, Player player, Block target) {
         final String itemID = OraxenItems.getIdByItem(item);
-        if (factory.isNotImplementedIn(itemID) || BlockHelpers.isStandingInside(player, placed)) return null;
-        if (!ProtectionLib.canBuild(player, placed.getLocation())) return null;
-        if (OraxenFurniture.isFurniture(placed)) return null;
+        if (factory.isNotImplementedIn(itemID) || BlockHelpers.isStandingInside(player, target)) return null;
+        if (!ProtectionLib.canBuild(player, target.getLocation())) return null;
+
+        for (final Entity entity : target.getWorld().getNearbyEntities(target.getLocation(), 1, 1, 1))
+            if (entity instanceof ItemFrame
+                    && entity.getLocation().getBlockX() == target.getX()
+                    && entity.getLocation().getBlockY() == target.getY()
+                    && entity.getLocation().getBlockZ() == target.getZ())
+                return null;
 
         return (FurnitureMechanic) factory.getMechanic(itemID);
     }
@@ -309,13 +315,13 @@ public class FurnitureListener implements Listener {
         Player player = projectile.getShooter() instanceof Player ? (Player) projectile.getShooter() : null;
 
         event.setCancelled(true);
-        if (mechanic.hasBarriers() || !isDamagingProjectile(projectile)) return;
+        if (mechanic.hasBarriers() || !isDamadgingProjectile(projectile)) return;
         if (player != null && !ProtectionLib.canBreak(player, furniture.getLocation())) return;
 
         OraxenFurniture.remove(furniture, player);
     }
 
-    private static boolean isDamagingProjectile(Projectile projectile) {
+    private static boolean isDamadgingProjectile(Projectile projectile) {
         return projectile instanceof AbstractArrow || projectile instanceof Fireball;
     }
 

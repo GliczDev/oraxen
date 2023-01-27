@@ -19,9 +19,7 @@ public class ShapelessLoader extends RecipeLoader {
 
         for (String ingredientLetter : Objects.requireNonNull(ingredientsSection).getKeys(false)) {
             ConfigurationSection itemSection = ingredientsSection.getConfigurationSection(ingredientLetter);
-            if (itemSection == null) continue;
-            RecipeChoice ingredient = getRecipeChoice(itemSection);
-            if (ingredient == null) continue;
+            RecipeChoice ingredient = getRecipeChoice(Objects.requireNonNull(itemSection));
             for (int i = 0; i < itemSection.getInt("amount"); i++)
                 recipe.addIngredient(ingredient);
         }

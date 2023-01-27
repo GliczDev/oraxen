@@ -1,13 +1,8 @@
 package io.th0rgal.oraxen.utils;
 
-import com.google.gson.JsonElement;
-import com.google.gson.JsonParser;
-import io.th0rgal.oraxen.utils.logs.Logs;
-import org.apache.commons.io.IOUtils;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 
 public class VirtualFile implements Comparable<VirtualFile> {
 
@@ -48,18 +43,6 @@ public class VirtualFile implements Comparable<VirtualFile> {
     @Override
     public int compareTo(@NotNull VirtualFile other) {
         return other.getPath().compareTo(getPath());
-    }
-
-    public JsonElement toJsonElement() {
-        InputStream fontInput = inputStream;
-        String fontContent;
-        try {
-            fontContent = IOUtils.toString(fontInput, StandardCharsets.UTF_8);
-        } catch (Exception e) {
-            Logs.logError(Utils.removeParentDirs(getPath()) + " was empty");
-            return null;
-        }
-        return JsonParser.parseString(fontContent);
     }
 
 }

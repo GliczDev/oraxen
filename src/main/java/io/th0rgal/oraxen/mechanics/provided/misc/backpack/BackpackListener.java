@@ -11,6 +11,7 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockPlaceEvent;
+import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerAttemptPickupItemEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
@@ -36,6 +37,19 @@ public class BackpackListener implements Listener {
     public void onBlockPlace(final BlockPlaceEvent event) {
         if (isBackpack(event.getPlayer().getInventory().getItemInMainHand()))
             event.setCancelled(true);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST)
+    public void onPlayerDeath(final PlayerDeathEvent event) {
+        Player player = event.getEntity();
+        ItemStack item = player.getInventory().getItemInMainHand().clone();
+        InventoryHolder holder = player.getOpenInventory().getTopInventory().getHolder();
+        if (!isBackpack(item) || !(holder instanceof StorageGui gui)) return;
+
+        // Remove backpack as this is dropped by gui.close()
+        if (!event.getKeepInventory())
+            event.getDrops().remove(item);
+        gui.close(player, true);
     }
 
     @EventHandler
@@ -106,6 +120,8 @@ public class BackpackListener implements Listener {
             backpack.setItemMeta(backpackMeta);
             if (mechanic.hasCloseSound())
                 player.getWorld().playSound(player.getLocation(), mechanic.getCloseSound(), mechanic.getVolume(), mechanic.getPitch());
+            if (player.isDead()) // Otherwise it dupes the backpack
+                player.getWorld().dropItemNaturally(player.getLocation(), backpack);
         });
 
         return gui;
